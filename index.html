@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Cold Plate — Setup / View / Solve</title>
+<style>
+  :root{ --setup-w: 340px; --view-w: 560px; --label-w: 160px; --gap: 14px; }
+  *{box-sizing:border-box}
+  body{margin:16px;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f3f4f6;color:#111;font-size:14px}
+  .wrap{display:flex;gap:var(--gap);align-items:flex-start}
+  .left-col{display:flex;flex-direction:column;gap:var(--gap);width:var(--setup-w)}
+  .mid-col{display:flex;flex-direction:column;gap:var(--gap);width:var(--view-w)}
+  .panel{background:#f7f7f7;border:1px solid #ccc;border-radius:12px;padding:14px}
+  .panel h3{margin:0 0 12px 0;text-align:center}
+  .row{display:grid;grid-template-columns: var(--label-w) 1fr;gap:12px;align-items:center;margin-bottom:12px}
+  .label-btn{background:#e0e0e0;border:1px solid #999;border-radius:8px;padding:6px 10px;text-align:center;white-space:nowrap;user-select:none;pointer-events:none}
+  .ctrl{width:75%;min-width:0;padding:6px 10px;border:1px solid #999;border-radius:8px;background:#fff;font-size:13px}
+  .radio-col{display:flex;flex-direction:column;gap:8px;width:75%}
+  .radio-col label{display:flex;align-items:center;gap:8px}
+  .canvas-wrap{background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px}
+  canvas{display:block;width:100%;height:auto}
+  .solve-grid{display:grid;grid-template-columns: var(--label-w) 1fr;gap:12px;align-items:center;margin-bottom:12px}
+  .total-box{width:75%;padding:6px 10px;border:1px solid #999;border-radius:8px;background:#fff}
+  .btn{padding:6px 10px;border:1px solid #999;border-radius:8px;background:#e0e0e0;cursor:pointer}
+  .btn.primary{background:#0b73c8;color:#fff;border-color:#0b73c8}
+  .btn.danger{background:#c80b2b;color:#fff;border-color:#c80b2b}
+  .btn[disabled]{opacity:.6;cursor:not-allowed}
+  .hs-list{max-height:160px;overflow:auto;border:1px solid #ddd;border-radius:8px;background:#fff;padding:8px}
+  .hs-item{display:grid;grid-template-columns: 28px 1fr auto;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px dashed #eee}
+  .hs-item:last-child{border-bottom:none}
+  .muted{color:#666;font-size:12px}
+  .prompt{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.35);z-index:9999}
+  .prompt .card{background:#fff;border-radius:12px;padding:14px;width:280px;border:1px solid #ccc;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+  .prompt h4{margin:0 0 10px}
+  .prompt .row2{display:flex;gap:8px;align-items:center}
+  .prompt select, .prompt input{flex:1;padding:6px 8px;border:1px solid #999;border-radius:8px}
+  .prompt .actions{margin-top:12px;display:flex;gap:8px;justify-content:flex-end}
+  .results{display:grid;gap:12px}
+  .legend{font-size:12px;color:#555}
+  table.caseTbl{width:100%; border-collapse:collapse; font-size:13px; background:#fff; border:1px solid #ddd; border-radius:8px; overflow:hidden}
+  .caseTbl th,.caseTbl td{padding:6px 8px; border-bottom:1px solid #eee; text-align:right; white-space:nowrap}
+  .caseTbl th:first-child,.caseTbl td:first-child{text-align:left}
+  .caseTbl tr:last-child td{border-bottom:none}
+  .caseTbl th{background:#f4f6f8}
+  .big-readout{margin-top:10px;font-weight:700;text-align:center}
+  .cbar-row{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+  .cbar-label{font-size:12px;color:#555;white-space:nowrap}
+  /* keep colorbar inside panel width */
+  #cbarCanvas{max-width:100%; height:24px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="left-col">
+    <div class="panel" id="setupPanel">
+      <h3>Setup</h3>
+      <div class="row"><span class="label-btn">Length, mm</span><input type="number" class="ctrl" id="len" value="250"></div>
+      <div class="row"><span class="label-btn">Width, mm</span><input type="number" class="ctrl" id="wid" value="200"></div>
+      <div class="row"><span class="label-btn">Thickness, mm</span><input type="number" class="ctrl" id="thk" value="10"></div>
+      <div class="row"><span class="label-btn">Material</span>
+        <select class="ctrl" id="mat"><option selected>Aluminum</option><option>Copper</option><option>Stainless Steel</option></select></div>
+      <div class="row"><span class="label-btn">Coolant</span>
+        <select class="ctrl" id="cool"><option selected>Water</option><option>Glycol 50/50</option></select></div>
+      <div class="row"><span class="label-btn">Coolant Inlet T, °C</span><input type="number" class="ctrl" id="Tin" value="20" step="0.1"></div>
+      <div class="row"><span class="label-btn">Tube Dia, mm</span><input type="number" class="ctrl" id="dia" value="6" step="0.1"></div>
+      <div class="row"><span class="label-btn">Flowrate, L/min</span><input type="number" class="ctrl" id="flow" value="7" step="0.1"></div>
+      <div class="row"><span class="label-btn">Friction Factor</span><input type="number" class="ctrl" id="ffactor" value="1" step="0.1" min="0"></div>
+      <div class="row"><span class="label-btn">Nu Factor</span><input type="number" class="ctrl" id="nufactor" value="1" step="0.1" min="0"></div>
+      <div class="row"><span class="label-btn">Flow Pattern</span>
+        <div class="radio-col"><label><input type="radio" name="flowmode" value="parallel" checked> Parallel</label>
+                              <label><input type="radio" name="flowmode" value="serpentine"> Serpentine</label></div></div>
+    </div>
+
+    <div class="panel" id="solvePanel">
+      <h3>Solve</h3>
+      <div class="solve-grid"><span class="label-btn">Min Spacing, mm</span><input type="number" class="ctrl" id="minSpace" step="0.5"></div>
+      <div class="solve-grid"><span class="label-btn">Max Spacing, mm</span><input type="number" class="ctrl" id="maxSpace" step="0.5"></div>
+      <div class="solve-grid"><span class="label-btn">Total Heat, W</span><input type="text" class="total-box" id="totalHeat" value="0" readonly></div>
+      <div class="solve-grid" style="margin-bottom:8px;"><span class="label-btn">Overlay Tubes</span>
+        <label style="display:flex;align-items:center;gap:8px;width:75%;"><input type="checkbox" id="showTubes" checked><span>Show Tubes (max spacing)</span></label></div>
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-bottom:12px;">
+        <button class="btn primary" id="addHeatBtn">Add Heat Source</button>
+        <button class="btn" id="removeSelBtn">Remove Selected</button>
+        <button class="btn danger" id="clearAllBtn">Clear All</button>
+      </div>
+      <div class="hs-list" id="hsList"><div class="muted">No heat sources yet.</div></div>
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+        <button class="btn" id="addTubesBtn">Add Tubing</button>
+        <button class="btn primary" id="solveGridBtn">Solve Grid</button>
+        <button class="btn primary" id="runBtn">Run Cases</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Results</h3>
+      <div class="results"><canvas id="chartT_DP" width="340" height="260" title="Click a point to preview that spacing"></canvas></div>
+      <div class="legend">Chart: left y = Max T (°C), right y = ΔP (kPa). Click a point to update the grid.</div>
+    </div>
+  </div>
+
+  <div class="mid-col">
+    <div class="panel view" id="viewPanel">
+      <h3>View</h3>
+      <div class="canvas-wrap"><canvas id="plateCanvas"></canvas></div>
+      <div class="cbar-row">
+        <span class="cbar-label">Temp scale:</span>
+        <canvas id="cbarCanvas" height="24"></canvas>
+        <span id="cbarMin" class="cbar-label">Tmin: —</span>
+        <span id="cbarMax" class="cbar-label">Tmax: —</span>
+      </div>
+      <div style="font-size:12px;color:#555;margin-top:6px">
+        Top view: Width left–right, Length vertical. Heatmap = plate T. Blue lines = tubes along length.
+      </div>
+    </div>
+
+    <div class="panel view" id="endViewPanel">
+      <h3>End View (Thickness × Width)</h3>
+      <div class="canvas-wrap"><canvas id="endCanvas" width="520" height="240"></canvas></div>
+      <div class="big-readout" id="outletTReadout">Outlet T: — °C</div>
+      <div style="font-size:12px;color:#555;margin-top:6px">
+        Blue circles are tubes; clear spacing = Max Spacing. Diameter = Tube Dia. Uniform scale preserves geometry.
+      </div>
+    </div>
+
+    <div class="panel" id="tablePanel">
+      <h3>Case Table</h3>
+      <div id="caseTableWrap"></div>
+      <div style="font-size:12px;color:#555;margin-top:6px">
+        Five spacing points between Min and Max (inclusive): Parallel or Serpentine as selected.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Heat load prompt -->
+<div class="prompt" id="heatPrompt">
+  <div class="card">
+    <h4>Heat Load (W)</h4>
+    <div class="row2">
+      <select id="heatSelect">
+        <option value="100">100 W</option><option value="250">250 W</option>
+        <option value="500">500 W</option><option value="1000" selected>1000 W</option>
+        <option value="2500">2500 W</option><option value="5000">5000 W</option>
+        <option value="custom">Custom…</option>
+      </select>
+      <input type="number" id="heatCustom" placeholder="Custom W" style="display:none">
+    </div>
+    <div class="actions"><button class="btn" id="cancelHeat">Cancel</button><button class="btn primary" id="okHeat">OK</button></div>
+  </div>
+</div>
+
+<script>
+  /* ---------- Elements ---------- */
+  const lenEl = document.getElementById('len');
+  const widEl = document.getElementById('wid');
+  const thkEl = document.getElementById('thk');
+  const diaEl = document.getElementById('dia');
+  const TinEl = document.getElementById('Tin');
+  const flowEl = document.getElementById('flow');
+  const ffEl   = document.getElementById('ffactor');
+  const nuEl   = document.getElementById('nufactor');
+  const maxSpaceEl = document.getElementById('maxSpace');
+  const minSpaceEl = document.getElementById('minSpace');
+  const modeEls = document.querySelectorAll('input[name="flowmode"]');
+  const showTubesEl = document.getElementById('showTubes');
+
+  const plateCanvas = document.getElementById('plateCanvas');
+  const pctx = plateCanvas.getContext('2d');
+
+  const endCanvas = document.getElementById('endCanvas');
+  const ectx = endCanvas.getContext('2d');
+
+  const chartEl = document.getElementById('chartT_DP');
+  const chartCtx = chartEl.getContext('2d');
+
+  const addHeatBtn    = document.getElementById('addHeatBtn');
+  const addTubesBtn   = document.getElementById('addTubesBtn');
+  const solveGridBtn  = document.getElementById('solveGridBtn');
+  const runBtn        = document.getElementById('runBtn');
+  const totalHeatEl   = document.getElementById('totalHeat');
+
+  const hsList        = document.getElementById('hsList');
+  const removeSelBtn  = document.getElementById('removeSelBtn');
+  const clearAllBtn   = document.getElementById('clearAllBtn');
+  const caseTableWrap = document.getElementById('caseTableWrap');
+  const outletTReadout= document.getElementById('outletTReadout');
+
+  const cbarCanvas = document.getElementById('cbarCanvas');
+  const cctx = cbarCanvas.getContext('2d');
+  const cbarMinEl = document.getElementById('cbarMin');
+  const cbarMaxEl = document.getElementById('cbarMax');
+
+  const heatPrompt = document.getElementById('heatPrompt');
+  const heatSelect = document.getElementById('heatSelect');
+  const heatCustom = document.getElementById('heatCustom');
+  const okHeat = document.getElementById('okHeat');
+  const cancelHeat = document.getElementById('cancelHeat');
+
+  /* ---------- State ---------- */
+  const heatSources = [];
+  let latestField = null;
+  let lastPlotX = null, lastPlotY1 = null, lastPlotY2 = null, lastPlotMap = null;
+
+  /* ---------- Props ---------- */
+  function fluidProps(){
+    const fluid = document.getElementById('cool').value;
+    return fluid.includes('Glycol')
+      ? {rho:1065, mu:0.006,  cp:3400, k:0.40}
+      : {rho:998,  mu:0.0010, cp:4180, k:0.60};
+  }
+  function plateK(){
+    const m = document.getElementById('mat').value;
+    if(m==='Copper') return 400;
+    if(m==='Stainless Steel') return 16;
+    return 205;
+  }
+
+  /* ---------- Canvas sizes (grid respects L/W) ---------- */
+  function sizeColorBar(){
+    // fit inside panel: leave room for labels (~160px)
+    const row = document.querySelector('#viewPanel .cbar-row');
+    const avail = Math.max(200, row.clientWidth - 170);
+    cbarCanvas.width = avail;
+  }
+  function setPlateCanvasSizeFromDims(){
+    const W = Math.max(1, Number(widEl.value)||1);
+    const L = Math.max(1, Number(lenEl.value)||1);
+    const wrap = document.querySelector('#viewPanel .canvas-wrap');
+    const cssW = Math.max(420, Math.floor(wrap.clientWidth-20));
+    const margin = 18;
+    const scale = (cssW - 2*margin) / W;
+    const cssH = Math.ceil(L*scale + 2*margin);
+    plateCanvas.width  = cssW;
+    plateCanvas.height = cssH;
+    plateCanvas._map = {margin, scale, W, L, x0:(cssW-(W*scale))/2, y0:(cssH-(L*scale))/2};
+    sizeColorBar();
+  }
+  function plateMapping(){ if(plateCanvas._map) return plateCanvas._map; setPlateCanvasSizeFromDims(); return plateCanvas._map; }
+  window.addEventListener('resize', ()=>{ setPlateCanvasSizeFromDims(); drawPlateGrid(); });
+
+  /* ---------- Geometry helpers ---------- */
+  function computeTubeCenters(spacingMM = Number(maxSpaceEl.value)||0){
+    const W = Math.max(1, Number(widEl.value)||1);
+    const D = Math.max(0.1, Number(diaEl.value)||0.1);
+    const S = Math.max(0, spacingMM);
+    const pitch = D + S;
+    const nTubes = Math.max(1, Math.floor((W + S) / pitch));
+    const usedW = nTubes*D + (nTubes - 1)*S;
+    const edgeClr = Math.max(0, (W - usedW)/2);
+    const centers = Array.from({length:nTubes}, (_,i)=> edgeClr + (D/2) + i*pitch);
+    return {centers, D, S, nTubes, edgeClr};
+  }
+
+  /* ---------- Draw plate + heatmap + tubes ---------- */
+  function drawPlateGrid(){
+    setPlateCanvasSizeFromDims();
+    const {W,L,scale,x0,y0} = plateMapping();
+    const cw = plateCanvas.width, ch = plateCanvas.height;
+
+    pctx.clearRect(0,0,cw,ch);
+    pctx.fillStyle = '#fff'; pctx.fillRect(0,0,cw,ch);
+
+    // outline
+    pctx.lineWidth = 2; pctx.strokeStyle = '#222';
+    pctx.strokeRect(x0,y0,W*scale,L*scale);
+
+    // 10×10 grid
+    pctx.lineWidth = 1; pctx.strokeStyle = '#c8c8c8'; pctx.beginPath();
+    for(let i=1;i<10;i++){
+      const vx = x0 + (W*scale)*i/10; pctx.moveTo(vx,y0); pctx.lineTo(vx,y0+L*scale);
+      const hy = y0 + (L*scale)*i/10; pctx.moveTo(x0,hy); pctx.lineTo(x0+W*scale,hy);
+    }
+    pctx.stroke();
+
+    // heat sources
+    heatSources.forEach(h => {
+      const x = x0 + Math.min(h.x1,h.x2)*scale;
+      const y = y0 + Math.min(h.y1,h.y2)*scale;
+      const w = Math.abs(h.x2 - h.x1)*scale;
+      const hgt = Math.abs(h.y2 - h.y1)*scale;
+      pctx.save(); pctx.globalAlpha=.55; pctx.fillStyle='#ff7a00'; pctx.fillRect(x,y,w,hgt); pctx.globalAlpha=1;
+      pctx.strokeStyle='#cc5f00'; pctx.lineWidth=2; pctx.strokeRect(x,y,w,hgt);
+      pctx.fillStyle='#000'; pctx.font='12px system-ui,sans-serif'; pctx.textAlign='center';
+      pctx.fillText(`${h.watts} W`, x+w/2, y+hgt/2+4); pctx.restore();
+    });
+
+    if(latestField){ drawHeatmap(latestField); updateColorBar(); }
+    drawTubesAndFlow();
+  }
+
+  function drawArrow(ctx, x, y, dx, dy, color, size=16, shaft=22){
+    const len = Math.hypot(dx,dy) || 1; const ux=dx/len, uy=dy/len;
+    ctx.save(); ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=2.25;
+    ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+ux*shaft,y+uy*shaft); ctx.stroke();
+    const hx=x+ux*shaft, hy=y+uy*shaft;
+    ctx.beginPath(); ctx.moveTo(hx,hy);
+    ctx.lineTo(hx - ux*size - uy*size*0.6, hy - uy*size + ux*size*0.6);
+    ctx.lineTo(hx - ux*size + uy*size*0.6, hy - uy*size - ux*size*0.6);
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+
+  function drawTubesAndFlow(){
+    const {scale,x0,y0,W,L} = plateMapping();
+    const {centers,nTubes} = computeTubeCenters();
+
+    const yInset = 4, y1 = y0 + yInset, y2 = y0 + L*scale - yInset;
+
+    pctx.save(); pctx.strokeStyle='#1f78ff'; pctx.lineWidth=3;
+    centers.forEach(cxmm=>{ const cx=x0+cxmm*scale; pctx.beginPath(); pctx.moveTo(cx,y1); pctx.lineTo(cx,y2); pctx.stroke(); });
+    pctx.restore();
+
+    const mode = [...modeEls].find(r=>r.checked).value;
+    const topY=y1, botY=y2, turnInset=6;
+
+    if(mode==='parallel'){
+      centers.forEach(cxmm=>{
+        const cx=x0+cxmm*scale;
+        drawArrow(pctx, cx, topY-12, 0,  1, '#0b73c8'); // in
+        drawArrow(pctx, cx, botY+6,  0,  1, '#d13f3f'); // out
+      });
+    }else{
+      for(let i=0;i<nTubes-1;i++){
+        const xA=x0+centers[i]*scale, xB=x0+centers[i+1]*scale;
+        const y=(i%2===0)? botY : topY;
+        pctx.save(); pctx.strokeStyle='#1f78ff'; pctx.lineWidth=3;
+        pctx.beginPath(); pctx.moveTo(xA+turnInset,y); pctx.lineTo(xB-turnInset,y); pctx.stroke(); pctx.restore();
+      }
+      const xIn=x0+centers[0]*scale; drawArrow(pctx,xIn,topY-14,0,1,'#0b73c8',18,24);
+      const last=nTubes-1; const xOut=x0+centers[last]*scale; const exitTop=(last%2===1);
+      if(exitTop) drawArrow(pctx,xOut,topY-14,0,-1,'#d13f3f',18,24); else drawArrow(pctx,xOut,botY+6,0,1,'#d13f3f',18,24);
+    }
+  }
+
+  /* ---------- End View ---------- */
+  function drawEndView(){
+    const W = Math.max(1, Number(widEl.value) || 1);
+    const T = Math.max(0.1, Number(thkEl.value) || 0.1);
+    const D = Math.max(0.1, Number(diaEl.value) || 0.1);
+    const S = Math.max(0, Number(maxSpaceEl.value) || 0);
+
+    const cw = endCanvas.width, ch = endCanvas.height, margin = 18;
+    const scale = Math.min((cw-2*margin)/W, (ch-2*margin)/T);
+    const rectW = W * scale, rectH = T * scale;
+    const x0 = (cw - rectW)/2, y0 = (ch - rectH)/2;
+
+    ectx.clearRect(0,0,cw,ch);
+    ectx.fillStyle = '#fff'; ectx.fillRect(0,0,cw,ch);
+    ectx.strokeStyle = '#222'; ectx.lineWidth = 2; ectx.strokeRect(x0, y0, rectW, rectH);
+
+    const pitch = D + S;
+    const nTubes = Math.max(1, Math.floor((W + S) / pitch));
+    const usedWidth = nTubes * D + (nTubes - 1) * S;
+    const edgeClear = Math.max(0, (W - usedWidth) / 2);
+
+    const yCenter = y0 + rectH / 2;
+    const r = (D/2) * scale;
+
+    ectx.fillStyle = '#1f78ff'; ectx.strokeStyle = '#0d43a3'; ectx.lineWidth = 1.5;
+    for(let i=0;i<nTubes;i++){
+      const cxmm = edgeClear + (D/2) + i * pitch;
+      const cx = x0 + cxmm * scale;
+      ectx.beginPath(); ectx.arc(cx, yCenter, r, 0, Math.PI*2); ectx.fill(); ectx.stroke();
+    }
+
+    ectx.fillStyle = '#333'; ectx.font = '12px system-ui, sans-serif'; ectx.textAlign = 'center';
+    ectx.fillText(`Width: ${W} mm`, x0 + rectW/2, y0 - 6);
+    ectx.save(); ectx.translate(x0 - 6, y0 + rectH/2); ectx.rotate(-Math.PI/2);
+    ectx.fillText(`Thickness: ${T} mm`, 0, 0); ectx.restore();
+  }
+  document.getElementById('addTubesBtn').addEventListener('click', drawEndView);
+
+  /* ---------- Plot (stores mapping + click select) ---------- */
+  function niceTicks(min, max, count=5){
+    const span = max-min || 1;
+    const step = Math.pow(10, Math.floor(Math.log10(span/count)));
+    const err = (span/count)/step;
+    const mult = err>=7.5? 10 : err>=3? 5 : err>=1.5? 2 : 1;
+    const niceStep = mult*step;
+    const niceMin = Math.floor(min/niceStep)*niceStep;
+    const niceMax = Math.ceil(max/niceStep)*niceStep;
+    const ticks = [];
+    for(let v=niceMin; v<=niceMax+1e-9; v+=niceStep) ticks.push(v);
+    return {ticks, min:niceMin, max:niceMax};
+  }
+  function plotCombined(ctx, xs, y1, y2, y1Label, y2Label){
+    const w=ctx.canvas.width, h=ctx.canvas.height;
+    const mL=56, mR=64, mB=58, mT=22;
+    ctx.clearRect(0,0,w,h);
+    const xTicks = niceTicks(Math.min(...xs), Math.max(...xs));
+    const y1Ticks = niceTicks(Math.min(...y1), Math.max(...y1));
+    const y2Ticks = niceTicks(Math.min(...y2), Math.max(...y2));
+    ctx.strokeStyle='#222'; ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(mL, h-mB); ctx.lineTo(w-mR, h-mB);
+    ctx.moveTo(mL, h-mB); ctx.lineTo(mL, mT);
+    ctx.moveTo(w-mR, h-mB); ctx.lineTo(w-mR, mT);
+    ctx.stroke();
+    ctx.strokeStyle='#eee'; ctx.beginPath();
+    xTicks.ticks.forEach(t=>{ const X=mL+(t-xTicks.min)/(xTicks.max-xTicks.min)*(w-mL-mR); ctx.moveTo(X,mT); ctx.lineTo(X,h-mB); });
+    y1Ticks.ticks.forEach(t=>{ const Y=h-mB-(t-y1Ticks.min)/(y1Ticks.max-y1Ticks.min)*(h-mT-mB); ctx.moveTo(mL,Y); ctx.lineTo(w-mR,Y); });
+    ctx.stroke();
+    ctx.fillStyle='#333'; ctx.font='12px system-ui, sans-serif'; ctx.textAlign='center';
+    xTicks.ticks.forEach(t=>{ const X=mL+(t-xTicks.min)/(xTicks.max-xTicks.min)*(w-mL-mR); ctx.fillText(t.toFixed(1), X, h-22); });
+    ctx.textAlign='right';
+    y1Ticks.ticks.forEach(t=>{ const Y=h-mB-(t-y1Ticks.min)/(y1Ticks.max-y1Ticks.min)*(h-mT-mB); ctx.fillText(t.toFixed(1), mL-10, Y+4); });
+    ctx.textAlign='left';
+    y2Ticks.ticks.forEach(t=>{ const Y=h-mB-(t-y2Ticks.min)/(y2Ticks.max-y2Ticks.min)*(h-mT-mB); ctx.fillText(t.toFixed(1), w-mR+10, Y+4); });
+    ctx.textAlign='center'; ctx.fillText('Spacing (mm)', (w)/2, h-6);
+    ctx.save(); ctx.translate(18, h/2); ctx.rotate(-Math.PI/2); ctx.fillText(y1Label, 0,0); ctx.restore();
+    ctx.save(); ctx.translate(w-18, h/2); ctx.rotate(Math.PI/2); ctx.fillText(y2Label, 0,0); ctx.restore();
+
+    function X(x){return mL+(x-xTicks.min)/(xTicks.max-xTicks.min)*(w-mL-mR)}
+    function Y1(y){return h-mB-(y-y1Ticks.min)/(y1Ticks.max-y1Ticks.min)*(h-mT-mB)}
+    function Y2(y){return h-mB-(y-y2Ticks.min)/(y2Ticks.max-y2Ticks.min)*(h-mT-mB)}
+
+    ctx.strokeStyle='#d13f3f'; ctx.lineWidth=2; ctx.beginPath();
+    xs.forEach((x,i)=>{const Xv=X(x), Yv=Y1(y1[i]); if(i===0)ctx.moveTo(Xv,Yv); else ctx.lineTo(Xv,Yv);}); ctx.stroke();
+    xs.forEach((x,i)=>{const Xv=X(x), Yv=Y1(y1[i]); ctx.fillStyle='#d13f3f'; ctx.beginPath(); ctx.arc(Xv,Yv,3,0,Math.PI*2); ctx.fill();});
+
+    ctx.strokeStyle='#0b73c8'; ctx.lineWidth=2; ctx.beginPath();
+    xs.forEach((x,i)=>{const Xv=X(x), Yv=Y2(y2[i]); if(i===0)ctx.moveTo(Xv,Yv); else ctx.lineTo(Xv,Yv);}); ctx.stroke();
+    xs.forEach((x,i)=>{const Xv=X(x), Yv=Y2(y2[i]); ctx.fillStyle='#0b73c8'; ctx.beginPath(); ctx.arc(Xv,Yv,3,0,Math.PI*2); ctx.fill();});
+
+    ctx.fillStyle='#333'; ctx.textAlign='left'; ctx.fillText('— Max T (°C)', mL+6, mT+14);
+    ctx.fillStyle='#0b73c8'; ctx.fillText('— ΔP (kPa)',  mL+140, mT+14);
+
+    lastPlotX = xs; lastPlotY1 = y1; lastPlotY2 = y2;
+    lastPlotMap = {mL,mR,mT,mB,w,h, xMin:xTicks.min, xMax:xTicks.max, y1Min:y1Ticks.min, y1Max:y1Ticks.max};
+  }
+
+  chartEl.addEventListener('click', (ev)=>{
+    if(!lastPlotMap || !lastPlotX) return;
+    const rect = ev.target.getBoundingClientRect();
+    const cx = ev.clientX - rect.left, cy = ev.clientY - rect.top;
+    const {mL,mR,h,mT,mB, xMin,xMax, y1Min,y1Max} = lastPlotMap;
+    function X(x){return mL+(x-xMin)/(xMax-xMin)*(ev.target.width-mL-mR)}
+    function Y1(y){return h-mB-(y-y1Min)/(y1Max-y1Min)*(h-mT-mB)}
+    let best=-1, bestD=1e9;
+    lastPlotX.forEach((x,i)=>{ const px=X(x), py=Y1(lastPlotY1[i]); const d=(px-cx)**2+(py-cy)**2; if(d<bestD){bestD=d; best=i;}});
+    if(best>=0){ const s = lastPlotX[best]; maxSpaceEl.value = Number(s.toFixed(3)); drawEndView(); solveGridForSpacing(s, true); }
+  });
+
+  /* ---------- ΔP / h quick calc (kept) ---------- */
+  function pdAndH(spacingMM){
+    const W = Math.max(1, Number(widEl.value)||1);
+    const L = Math.max(1, Number(lenEl.value)||1);
+    const Dmm = Math.max(0.1, Number(diaEl.value)||0.1);
+    const D = Dmm/1000;
+    const Q_Lmin = Math.max(0, Number(flowEl.value)||0);
+    const Q = Q_Lmin/1000/60;
+    const {rho,mu,cp,k} = fluidProps();
+    const Tin = Number(TinEl.value)||20;
+    const ff = Math.max(0, Number(ffEl.value)||1);
+    const nuf = Math.max(0, Number(nuEl.value)||1);
+
+    const pitch = Dmm + spacingMM;
+    const nTubes = Math.max(1, Math.floor((W + spacingMM) / pitch));
+    const mode = [...modeEls].find(r=>r.checked).value;
+
+    const turnLen = Math.PI * Dmm * 0.5;
+    const Lserp_mm = nTubes*L + Math.max(0,(nTubes-1))*turnLen;
+    const Lserp = Lserp_mm/1000;
+
+    let perTubeQ, tubeLen;
+    if(mode==='parallel'){ perTubeQ = Q/nTubes; tubeLen = L/1000; }
+    else { perTubeQ = Q; tubeLen = Lserp; }
+
+    const A = Math.PI*(D*D)/4;
+    const v = (perTubeQ>0)? perTubeQ/A : 0;
+    const Re = (D>0 && mu>0)? rho*v*D/mu : 0;
+    const Pr = (mu>0 && k>0)? (cp*mu)/k : 0;
+
+    let f; if(Re<2300) f = (Re>0)? 64/Re : 0; else f = 0.3164/Math.pow(Re,0.25);
+    f *= ff;
+    let Nu = (Re<2300)? 3.66 : 0.023*Math.pow(Re,0.8)*Math.pow(Pr,0.4);
+    Nu *= nuf;
+    const h = (Nu>0)? Nu*k/D : 0;
+    const dP = f * (tubeLen/D) * 0.5 * rho * v*v; // Pa
+    return {dP_kPa:dP/1000, h, nTubes, D, perTubeQ, Re, Tin};
+  }
+
+  /* ---------- Core grid solver (returns Tmax; can also update view) ---------- */
+  function solveGridForSpacing(Smm, updateView=false){
+    const Wmm = Math.max(1, Number(widEl.value)||1);
+    const Lmm = Math.max(1, Number(lenEl.value)||1);
+    const t_m  = Math.max(1e-4, (Number(thkEl.value)||1)/1000);
+    const k_p  = plateK();
+    const {rho,mu,cp,k} = fluidProps();
+    const Tin  = Number(TinEl.value)||20;
+    const Dmm  = Math.max(0.1, Number(diaEl.value)||0.1);
+    const D    = Dmm/1000;
+    const Q_Lmin = Math.max(0, Number(flowEl.value)||0);
+    const Q_tot  = Q_Lmin/1000/60;
+    const mode = [...modeEls].find(r=>r.checked).value;
+
+    const {centers,nTubes} = computeTubeCenters(Smm);
+    const Nx = Math.max(12, Math.min(80, Math.round(Wmm/5)));
+    const Ny = Math.max(12, Math.min(160, Math.round(Nx*(Lmm/Wmm))));
+    const dx_m = (Wmm/1000)/Nx, dy_m = (Lmm/1000)/Ny;
+
+    const qvol = new Float32Array(Nx*Ny);
+    function addHeatRect(x1mm,y1mm,x2mm,y2mm, watts){
+      const x1 = Math.min(x1mm,x2mm)/Wmm*Nx, x2 = Math.max(x1mm,x2mm)/Wmm*Nx;
+      const y1 = Math.min(y1mm,y2mm)/Lmm*Ny, y2 = Math.max(y1mm,y2mm)/Lmm*Ny;
+      const ix1 = Math.max(0, Math.floor(x1)), ix2 = Math.min(Nx-1, Math.ceil(x2)-1);
+      const iy1 = Math.max(0, Math.floor(y1)), iy2 = Math.min(Ny-1, Math.ceil(y2)-1);
+      const area_m2 = ( (x2-x1)/Nx * Wmm/1000 ) * ( (y2-y1)/Ny * Lmm/1000 );
+      const flux_W_m2 = area_m2>0 ? watts/area_m2 : 0;
+      const q3 = t_m>0 ? flux_W_m2 / t_m : 0;
+      for(let j=iy1;j<=iy2;j++) for(let i=ix1;i<=ix2;i++) qvol[j*Nx+i] += q3;
+    }
+    heatSources.forEach(h => addHeatRect(h.x1, h.y1, h.x2, h.y2, +h.watts||0));
+
+    const tubeCols = centers.map(mm => Math.min(Nx-1, Math.max(0, Math.round(mm/Wmm*Nx - 0.5)))).sort((a,b)=>a-b);
+    const Aflow = Math.PI*(D*D)/4;
+    const P_i = Math.PI*D;
+
+    const T = new Float32Array(Nx*Ny); T.fill(Tin);
+    const Tf_cell = new Float32Array(Nx*Ny); Tf_cell.fill(Tin);
+
+    const nuf = Math.max(0, Number(nuEl.value)||1);
+    function commonH(perTubeQ){
+      const v = perTubeQ>0 ? perTubeQ/Aflow : 0;
+      const Re = (D>0 && mu>0)? rho*v*D/mu : 0;
+      const Pr = (mu>0 && k>0)? (cp*mu)/k : 0;
+      let Nu = (Re<2300)? 3.66 : 0.023*Math.pow(Re,0.8)*Math.pow(Pr,0.4);
+      Nu *= nuf;
+      return {h_i: (Nu>0)? Nu*k/D : 0, mdot: rho*perTubeQ};
+    }
+
+    function updateFluidParallel(){
+      const perTubeQ = Q_tot / nTubes;
+      const {h_i, mdot} = commonH(perTubeQ);
+      for(const col of tubeCols){
+        let Tf = Tin;
+        for(let j=0;j<Ny;j++){
+          const Tw = T[j*Nx + col];
+          const dTf = (h_i * P_i * (Tw - Tf) * dy_m) / ((mdot>0?mdot:1e-12) * cp);
+          Tf_cell[j*Nx + col] = Tf;
+          Tf = Tf + dTf;
+        }
+      }
+      return {h_i};
+    }
+    function updateFluidSerpentine(){
+      const perTubeQ = Q_tot;
+      const {h_i, mdot} = commonH(perTubeQ);
+      const order = [];
+      tubeCols.forEach((col, idx)=>{
+        if(idx%2===0){ for(let j=0;j<Ny;j++) order.push([col,j]); }
+        else{ for(let j=Ny-1;j>=0;j--) order.push([col,j]); }
+      });
+      let Tf = Tin;
+      for(const [i,j] of order){
+        const Tw = T[j*Nx + i];
+        const dTf = (h_i * P_i * (Tw - Tf) * dy_m) / ((mdot>0?mdot:1e-12) * cp);
+        Tf_cell[j*Nx + i] = Tf;
+        Tf = Tf + dTf;
+      }
+      return {h_i};
+    }
+
+    const aE0 = k_p*t_m*dy_m/dx_m, aW0=aE0, aN0=k_p*t_m*dx_m/dy_m, aS0=aN0;
+    const iters = 200, omega = 1.0;
+    for(let it=0; it<iters; it++){
+      let h_i; if(mode==='serpentine'){ ({h_i}=updateFluidSerpentine()); } else { ({h_i}=updateFluidParallel()); }
+      for(let j=0;j<Ny;j++){
+        for(let i=0;i<Nx;i++){
+          let aE=aE0,aW=aW0,aN=aN0,aS=aS0;
+          if(i===Nx-1)aE=0; if(i===0)aW=0; if(j===Ny-1)aN=0; if(j===0)aS=0;
+          let aConv=0,bConv=0;
+          if(tubeCols.includes(i)){ aConv = h_i*P_i*dy_m; bConv = aConv * Tf_cell[j*Nx+i]; }
+          const aP=aE+aW+aN+aS+aConv;
+          const bSrc=qvol[j*Nx+i]*dx_m*dy_m*t_m;
+          const rowN=(j<Ny-1)?T[(j+1)*Nx+i]:T[j*Nx+i];
+          const rowS=(j>0)?   T[(j-1)*Nx+i]:T[j*Nx+i];
+          const colE=(i<Nx-1)?T[j*Nx+i+1]:T[j*Nx+i];
+          const colW=(i>0)?   T[j*Nx+i-1]:T[j*Nx+i];
+          const Tnew=(aE*colE+aW*colW+aN*rowN+aS*rowS+bSrc+bConv)/(aP>1e-12?aP:1e-12);
+          const idx=j*Nx+i; T[idx]=(1-omega)*T[idx]+omega*Tnew;
+        }
+      }
+    }
+    // return results
+    let Tmax=-Infinity; for(const v of T) if(v>Tmax) Tmax=v;
+    if(updateView){ latestField={Nx,Ny,T}; drawPlateGrid(); updateOutletReadoutForMax(); }
+    return {Tmax};
+  }
+
+  /* ---------- Results table & plotting using the grid Tmax ---------- */
+  function renderCaseTable(rows){
+    const fmt=(v,n=2)=> (isFinite(v)?Number(v).toFixed(n):'—');
+    caseTableWrap.innerHTML = `
+      <table class="caseTbl">
+        <thead><tr><th>Spacing (mm)</th><th>Tubes</th><th>h (W/m²·K)</th><th>Re</th><th>Max T (°C)</th><th>ΔP (kPa)</th></tr></thead>
+        <tbody>
+          ${rows.map(r=>`<tr>
+            <td>${fmt(r.spacing,2)}</td><td>${r.nTubes}</td><td>${fmt(r.h,0)}</td>
+            <td>${fmt(r.Re,0)}</td><td>${fmt(r.Tmax_C,2)}</td><td>${fmt(r.dP_kPa,2)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  function runCases(){
+    const Smin = Number(minSpaceEl.value);
+    const Smax = Number(maxSpaceEl.value);
+    if(!isFinite(Smin)||!isFinite(Smax)||Smin<=0||Smax<=0||Smax<Smin){ alert('Enter valid Min/Max spacings (mm), with Max ≥ Min > 0.'); return; }
+    const S = [0,1,2,3,4].map(i => Smin + i*(Smax-Smin)/4);
+
+    // compute ΔP/h fast, and Tmax via the *grid* solver to keep plots consistent with the heatmap
+    const rows = S.map(s => {
+      const hyd = pdAndH(s);
+      const tRes = solveGridForSpacing(s, false);
+      return {spacing:s, nTubes:hyd.nTubes, h:hyd.h, Re:hyd.Re, dP_kPa:hyd.dP_kPa, Tmax_C:tRes.Tmax};
+    });
+
+    plotCombined(chartCtx, rows.map(r=>r.spacing), rows.map(r=>r.Tmax_C), rows.map(r=>r.dP_kPa), 'Max T (°C)', 'ΔP (kPa)');
+    renderCaseTable(rows);
+    // keep max spacing field shown
+    solveGridForSpacing(Smax, true);
+    updateOutletReadoutForMax();
+  }
+
+  /* ---------- Heatmap color bar ---------- */
+  function drawHeatmap(field){
+    const {Nx,Ny,T} = field;
+    const {W,L,scale,x0,y0} = plateMapping();
+    let tmin=Infinity, tmax=-Infinity; for(let v of T){ if(v<tmin)tmin=v; if(v>tmax)tmax=v; }
+    function colorFor(val){
+      const r=(tmax===tmin)?0.5:(val-tmin)/(tmax-tmin); let R,G,B;
+      if(r<0.33){ const a=r/0.33; R=0; G=Math.round(255*a); B=Math.round(255*(1-a)); }
+      else if(r<0.66){ const a=(r-0.33)/0.33; R=Math.round(255*a); G=255; B=0; }
+      else{ const a=(r-0.66)/0.34; R=255; G=Math.round(255*(1-a)); B=0; }
+      return `rgba(${R},${G},${B},0.45)`;
+    }
+    const dx=(W*scale)/Nx, dy=(L*scale)/Ny;
+    for(let j=0;j<Ny;j++) for(let i=0;i<Nx;i++){ pctx.fillStyle=colorFor(T[j*Nx+i]); pctx.fillRect(x0+i*dx, y0+j*dy, dx, dy); }
+  }
+  function updateColorBar(){
+    sizeColorBar();
+    if(!latestField){ cctx.clearRect(0,0,cbarCanvas.width,cbarCanvas.height); cbarMinEl.textContent='Tmin: —'; cbarMaxEl.textContent='Tmax: —'; return; }
+    const {T}=latestField; let tmin=Infinity,tmax=-Infinity; for(const v of T){ if(v<tmin)tmin=v; if(v>tmax)tmax=v; }
+    const w=cbarCanvas.width, h=cbarCanvas.height, m=4;
+    for(let x=0;x<w;x++){
+      const r=x/(w-1); let R,G,B;
+      if(r<0.33){ const a=r/0.33; R=0; G=Math.round(255*a); B=Math.round(255*(1-a)); }
+      else if(r<0.66){ const a=(r-0.33)/0.33; R=Math.round(255*a); G=255; B=0; }
+      else{ const a=(r-0.66)/0.34; R=255; G=Math.round(255*(1-a)); B=0; }
+      cctx.fillStyle=`rgb(${R},${G},${B})`; cctx.fillRect(x,m,1,h-2*m);
+    }
+    cctx.strokeStyle='#333'; cctx.strokeRect(0.5,m+0.5,w-1,h-2*m-1);
+    cbarMinEl.textContent=`Tmin: ${tmin.toFixed(2)} °C`;
+    cbarMaxEl.textContent=`Tmax: ${tmax.toFixed(2)} °C`;
+  }
+
+  /* ---------- Heat source UI ---------- */
+  let addMode=false, drag=null, pendingRect=null;
+  function canvasToPlate(mx,my){ const {scale,x0,y0}=plateMapping(); return {px:(mx-x0)/scale, py:(my-y0)/scale}; }
+  document.getElementById('addHeatBtn').addEventListener('click', ()=>{ addMode=true; addHeatBtn.disabled=true; addHeatBtn.textContent='Drag on grid to add…'; });
+  plateCanvas.addEventListener('mousedown', (e)=>{
+    if(!addMode) return; const r=plateCanvas.getBoundingClientRect(); const {px,py}=canvasToPlate(e.clientX-r.left, e.clientY-r.top);
+    const {W,L}=plateMapping(); if(px<0||py<0||px>W||py>L) return; drag={x1:px,y1:py,x2:px,y2:py};
+  });
+  plateCanvas.addEventListener('mousemove', (e)=>{
+    if(!addMode||!drag) return; const r=plateCanvas.getBoundingClientRect(); const {px,py}=canvasToPlate(e.clientX-r.left, e.clientY-r.top);
+    drag.x2=Math.max(0,px); drag.y2=Math.max(0,py); drawPlateGrid();
+    const {scale,x0,y0}=plateMapping(); const x=x0+Math.min(drag.x1,drag.x2)*scale; const y=y0+Math.min(drag.y1,drag.y2)*scale;
+    const w=Math.abs(drag.x2-drag.x1)*scale; const hgt=Math.abs(drag.y2-drag.y1)*scale; pctx.save(); pctx.globalAlpha=.35; pctx.fillStyle='#ff7a00'; pctx.fillRect(x,y,w,hgt); pctx.restore();
+  });
+  plateCanvas.addEventListener('mouseup', ()=>{
+    if(!addMode||!drag) return; pendingRect={...drag}; drag=null; showHeatPrompt();
+  });
+  function showHeatPrompt(){ heatSelect.value='1000'; heatCustom.style.display='none'; heatCustom.value=''; heatPrompt.style.display='flex'; }
+  heatSelect.addEventListener('change', ()=>{ heatCustom.style.display = (heatSelect.value==='custom') ? '' : 'none'; });
+  cancelHeat.addEventListener('click', ()=>{ heatPrompt.style.display='none'; pendingRect=null; addMode=false; addHeatBtn.disabled=false; addHeatBtn.textContent='Add Heat Source'; drawPlateGrid(); });
+  okHeat.addEventListener('click', ()=>{
+    let w = (heatSelect.value==='custom') ? Number(heatCustom.value) : Number(heatSelect.value);
+    if(!isFinite(w) || w<=0){ alert('Enter a positive heat load (W).'); return; }
+    if(pendingRect){ heatSources.push({...pendingRect, watts:w}); pendingRect=null; updateTotalHeat(); renderHSList(); drawPlateGrid(); }
+    heatPrompt.style.display='none'; addMode=false; addHeatBtn.disabled=false; addHeatBtn.textContent='Add Heat Source';
+  });
+  function updateTotalHeat(){ const sum = heatSources.reduce((a,b)=>a + (Number(b.watts)||0), 0); totalHeatEl.value = String(sum); }
+  function renderHSList(){
+    hsList.innerHTML = (heatSources.length? '' : '<div class="muted">No heat sources yet.</div>');
+    heatSources.forEach((hs, idx)=>{
+      const div=document.createElement('div'); div.className='hs-item';
+      div.innerHTML=`<input type="checkbox" data-idx="${idx}">
+        <div><div><strong>HS ${idx+1}</strong> — ${Math.abs(hs.x2-hs.x1).toFixed(1)} × ${Math.abs(hs.y2-hs.y1).toFixed(1)} mm</div>
+        <div class="muted">${hs.watts} W</div></div><button class="btn danger" data-del="${idx}">Remove</button>`;
+      hsList.appendChild(div);
+    });
+    hsList.querySelectorAll('button[data-del]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ const i=Number(btn.getAttribute('data-del')); heatSources.splice(i,1); updateTotalHeat(); renderHSList(); drawPlateGrid(); });
+    });
+  }
+  document.getElementById('removeSelBtn').addEventListener('click', ()=>{
+    const idxs=[...hsList.querySelectorAll('input[type="checkbox"]:checked')].map(c=>+c.dataset.idx).sort((a,b)=>b-a);
+    if(!idxs.length) return; idxs.forEach(i=>heatSources.splice(i,1)); updateTotalHeat(); renderHSList(); drawPlateGrid();
+  });
+  document.getElementById('clearAllBtn').addEventListener('click', ()=>{
+    if(!heatSources.length) return; heatSources.length=0; updateTotalHeat(); renderHSList(); drawPlateGrid();
+  });
+
+  function updateOutletReadoutForMax(){
+    const S = Number(maxSpaceEl.value);
+    if(!isFinite(S) || S<=0){ outletTReadout.textContent = 'Outlet T: — °C'; return; }
+    const hyd = pdAndH(S);
+    const mdot = fluidProps().rho*(Number(flowEl.value||0)/1000/60);
+    const Qtotal = heatSources.reduce((a,b)=>a+(+b.watts||0),0);
+    const Tout = (mdot>0)? (hyd.Tin + Qtotal/(mdot*fluidProps().cp)) : hyd.Tin;
+    outletTReadout.textContent = `Outlet T: ${Tout.toFixed(2)} °C`;
+  }
+
+  /* ---------- Public actions ---------- */
+  function onDimsChange(){ setPlateCanvasSizeFromDims(); drawPlateGrid(); }
+  [lenEl, widEl].forEach(el => el.addEventListener('input', onDimsChange));
+  [diaEl, maxSpaceEl, showTubesEl].forEach(el => el.addEventListener('input', drawPlateGrid));
+  document.getElementById('addTubesBtn').addEventListener('click', drawEndView);
+  document.getElementById('solveGridBtn').addEventListener('click', ()=>solveGridForSpacing(Number(maxSpaceEl.value)||0, true));
+  document.getElementById('runBtn').addEventListener('click', runCases);
+
+  /* ---------- Init ---------- */
+  setPlateCanvasSizeFromDims(); sizeColorBar(); drawPlateGrid(); renderHSList(); updateTotalHeat(); updateOutletReadoutForMax();
+</script>
+</body>
+</html>
